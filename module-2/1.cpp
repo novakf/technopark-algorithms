@@ -1,18 +1,16 @@
+/*
+1_1. Хеш-таблица.
+Реализуйте структуру данных типа “множество строк” на основе динамической
+хеш-таблицы с открытой адресацией.
+Для разрешения коллизий используйте квадратичное пробирование.
+i-ая проба g(k, i)=g(k, i-1) + i (mod m). m - степень двойки.
+*/
+
 #include <iostream>
 #include <vector>
 
 const size_t DEFAULT_SIZE = 8;
-const float MAX_ALPHA = 2;
-
-template <typename T>
-struct HashTableNode {
-  HashTableNode() : next(nullptr) {}
-  HashTableNode(const T& data, HashTableNode<T>* next)
-      : data(data), next(next) {}
-
-  T data;
-  HashTableNode* next;
-};
+const float MAX_ALPHA = 0.75;
 
 class StringHasher {
  public:
@@ -34,82 +32,101 @@ template <typename T, typename Hasher>
 class HashTable {
  public:
   HashTable(size_t initial_size = DEFAULT_SIZE)
-      : size(0), table(initial_size, nullptr) {}
+      : size(0), table(initial_size) {}
   ~HashTable();
 
   bool Add(const T& key);
   bool Has(const T& key);
   bool Delete(const T& key);
 
+  void show() {
+    for (int i = 0; i < table.size(); i++) {
+      if (table[i].status != HashTableCell::FIL)
+        std::cout << (table[i].status == HashTableCell::DEL ? "DEL" : "NIL")
+                  << " ";
+      else
+        std::cout << table[i].data << " ";
+    }
+    std::cout << std::endl;
+  };
+
  private:
   void grow();
 
-  std::vector<HashTableNode<T>*> table;
+  struct HashTableCell {
+    HashTableCell() : status(NIL) {}
+    HashTableCell(const T& data) : data(data), status(FIL) {}
+    T data;
+    enum Status { NIL, DEL, FIL } status;
+  };
+
+  std::vector<HashTableCell> table;
   size_t size;
   Hasher hasher;
 };
 
 template <typename T, typename Hasher>
-HashTable<T, Hasher>::~HashTable() {
-  for (int i = 0; i < table.size(); i++) {
-    HashTableNode<T>* node = table[i];
-
-    while (node != nullptr) {
-      HashTableNode<T>* next = node->next;
-      delete node;
-      node = next;
-    }
-  }
-}
+HashTable<T, Hasher>::~HashTable() {}
 
 template <typename T, typename Hasher>
 void HashTable<T, Hasher>::grow() {
-  std::vector<HashTableNode<T>*> newTable(table.size() * 2, nullptr);
+  HashTable<std::string, StringHasher> newHashTable(table.size() * 2);
 
   for (int i = 0; i < table.size(); i++) {
-    HashTableNode<T>* node = table[i];
-
-    while (node != nullptr) {
-      HashTableNode<T>* next = node->next;
-      size_t newHash = hasher(node->data) % newTable.size();
-      node->next = newTable[newHash];
-      newTable[newHash] = node;
-      node = next;
+    int hash = hasher(table[i].data) % newHashTable.table.size();
+    if (table[i].status == HashTableCell::FIL) {
+      newHashTable.Add(table[i].data);
     }
-
-    table = std::move(newTable);
   }
+
+  table = std::move(newHashTable.table);
 }
 
 template <typename T, typename Hasher>
 bool HashTable<T, Hasher>::Add(const T& key) {
-  if (size > table.size() * MAX_ALPHA) grow();
-
   size_t hash = hasher(key) % table.size();
-  HashTableNode<T>* node = table[hash];
+  int i = 1;
 
-  while (node != nullptr) {
-    if (node->data == key) {
+  int deletedCellPos = -1;
+
+  while (i != table.size()) {
+    if (table[hash].data == key && table[hash].status == HashTableCell::FIL)
       return false;
-    }
-    node = node->next;
+
+    if (deletedCellPos == -1 && table[hash].status == HashTableCell::DEL)
+      deletedCellPos = hash;
+
+    if (table[hash].status == HashTableCell::NIL) break;
+
+    hash = (hash + i + 1) % table.size();
+    i++;
   }
 
-  table[hash] = new HashTableNode<T>(key, table[hash]);
+  if (deletedCellPos != -1)
+    table[deletedCellPos] = HashTableCell(key);
+  else
+    table[hash] = HashTableCell(key);
+    
   size++;
+
+  if (size > table.size() * MAX_ALPHA) grow();
   return true;
 }
 
 template <typename T, typename Hasher>
 bool HashTable<T, Hasher>::Has(const T& key) {
   size_t hash = hasher(key) % table.size();
-  HashTableNode<T>* node = table[hash];
 
-  while (node != nullptr) {
-    if (node->data == key) {
+  int i = 1;
+
+  while (i != table.size()) {
+    if (table[hash].data == key && table[hash].status == HashTableCell::FIL)
       return true;
-    }
-    node = node->next;
+
+    if (table[hash].status == HashTableCell::NIL) break;
+
+    hash = (hash + i + 1) % table.size();
+    i++;
   }
 
   return false;
@@ -118,27 +135,22 @@ bool HashTable<T, Hasher>::Has(const T& key) {
 template <typename T, typename Hasher>
 bool HashTable<T, Hasher>::Delete(const T& key) {
   size_t hash = hasher(key) % table.size();
+  int i = 1;
 
-  HashTableNode<T>* node = table[hash];
-  HashTableNode<T>* prev = nullptr;
+  while (i != table.size()) {
+    if (table[hash].status == HashTableCell::NIL) break;
 
-  while (node != nullptr) {
-    if (node->data == key) break;
-    prev = node;
-    node = node->next;
+    if (table[hash].data == key && table[hash].status != HashTableCell::DEL) {
+      table[hash].status = HashTableCell::DEL;
+      size--;
+      return true;
+    }
+
+    hash = (hash + i + 1) % table.size();
+    i++;
   }
 
-  if (node == nullptr) return false;
-
-  if (prev == nullptr) {
-    table[hash] = node->next;
-  } else {
-    prev->next = node->next;
-  }
-
-  delete node;
-  size--;
-  return true;
+  return false;
 }
 
 int main(int argc, const char* argv[]) {
@@ -151,16 +163,19 @@ int main(int argc, const char* argv[]) {
     switch (operation) {
       case '+': {
         std::cout << (hashTable.Add(key) ? "OK" : "FAIL") << std::endl;
+        // hashTable.show();
         break;
       }
 
       case '-': {
         std::cout << (hashTable.Delete(key) ? "OK" : "FAIL") << std::endl;
+        // hashTable.show();
         break;
       }
 
       case '?': {
         std::cout << (hashTable.Has(key) ? "OK" : "FAIL") << std::endl;
+        // hashTable.show();
         break;
       }
     }
