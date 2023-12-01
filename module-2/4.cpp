@@ -11,7 +11,7 @@ class DefaultMoreComparator {
   bool operator()(const T &first, const T &second) { return first > second; }
 };
 
-template <typename T, typename Comparator = DefaultMoreComparator<T>>
+template <typename T, typename Comparator = std::less<T>>
 class AvlTree {
   struct Node {
     Node(const T &data)
@@ -46,8 +46,8 @@ class AvlTree {
   void destroyTree(Node *node);
   Node *deleteInternal(Node *node, const T &data);
 
-  Node *findMin(Node *node);
-  Node *findMax(Node *node);
+  Node *findAndRemoveMin(Node *left, Node *right);
+  Node *findAndRemoveMax(Node *left, Node *right);
   Node *removeMin(Node *node);
   Node *removeMax(Node *node);
 
@@ -72,9 +72,10 @@ class AvlTree {
 template <typename T, typename Comparator>
 void AvlTree<T, Comparator>::show(Node *node) {
   if (!node) return;
+
   std::cout << node->data << " ";
-  show(node->right);
   show(node->left);
+  show(node->right);
 }
 
 template <typename T, typename Comparator>
@@ -113,7 +114,7 @@ int AvlTree<T, Comparator>::getPos(Node *node, T data) {
     return getPos(node->left, data);
   }
 
-  return getPos(node->right, data) + getNodesCount(node->left) + 1;
+  return getNodesCount(node->left) + 1 + getPos(node->right, data);
 }
 
 template <typename T, typename Comparator>
@@ -143,28 +144,27 @@ typename AvlTree<T, Comparator>::Node *AvlTree<T, Comparator>::deleteInternal(
     if (!right) return left;
     if (!left) return right;
 
-    Node *min = findMin(right);
-    Node *max = findMax(left);
-
-    if (min->height > max->height) {
-      min->right = removeMin(right);
-      min->left = left;
-      return doBalance(min);
-    } else {
-      max->left = removeMax(left);
-      max->right = right;
-      return doBalance(max);
-    }
+    if (right->height > left->height)
+      // минимальный в правом поддереве
+      return findAndRemoveMin(left, right);
+    else
+      // максимальный в левом поддереве
+      return findAndRemoveMax(left, right);
   }
 
   return doBalance(node);
 }
 
 template <typename T, typename Comparator>
-typename AvlTree<T, Comparator>::Node *AvlTree<T, Comparator>::findMin(
-    Node *node) {
-  while (node->left) node = node->left;
-  return node;
+typename AvlTree<T, Comparator>::Node *AvlTree<T, Comparator>::findAndRemoveMin(
+    Node *left, Node *right) {
+  Node *minNode = right;
+  while (minNode->left) minNode = minNode->left;
+
+  minNode->right = removeMin(right);
+  minNode->left = left;
+
+  return doBalance(minNode);
 }
 
 template <typename T, typename Comparator>
@@ -176,10 +176,15 @@ typename AvlTree<T, Comparator>::Node *AvlTree<T, Comparator>::removeMin(
 }
 
 template <typename T, typename Comparator>
-typename AvlTree<T, Comparator>::Node *AvlTree<T, Comparator>::findMax(
-    Node *node) {
-  while (node->right) node = node->right;
-  return node;
+typename AvlTree<T, Comparator>::Node *AvlTree<T, Comparator>::findAndRemoveMax(
+    Node *left, Node *right) {
+  Node *maxNode = left;
+  while (maxNode->right) maxNode = maxNode->right;
+
+  maxNode->left = removeMax(left);
+  maxNode->right = right;
+
+  return doBalance(maxNode);
 }
 
 template <typename T, typename Comparator>
@@ -193,9 +198,7 @@ typename AvlTree<T, Comparator>::Node *AvlTree<T, Comparator>::removeMax(
 template <typename T, typename Comparator>
 typename AvlTree<T, Comparator>::Node *AvlTree<T, Comparator>::addInternal(
     Node *node, const T &data) {
-  if (!node) {
-    return new Node(data);
-  };
+  if (!node) return new Node(data);
 
   if (cmp(data, node->data))
     node->left = addInternal(node->left, data);
@@ -266,7 +269,7 @@ typename AvlTree<T, Comparator>::Node *AvlTree<T, Comparator>::doBalance(
 }
 
 int main(int argc, const char *argv[]) {
-  AvlTree<int> tree;
+  AvlTree<int, DefaultMoreComparator<int>> tree;
   int val = 0;
   int length = 0;
   std::cin >> length;
@@ -288,9 +291,9 @@ int main(int argc, const char *argv[]) {
         break;
       }
     }
+    // tree.showTree();
+    // std::cout << std::endl;
   }
-
-  // tree.showTree();
 
   return 0;
 }
