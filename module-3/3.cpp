@@ -21,24 +21,12 @@ struct ListGraph {
   void AddEdge(int from, int to, int weight);
   int VerticesCount() const;
 
-  void show();
-
   std::vector<std::pair<int, int>> GetNextVertices(int vertex) const;
   std::vector<std::pair<int, int>> GetPrevVertices(int vertex) const;
 
  private:
   std::vector<std::vector<std::pair<int, int>>> adjacencyLists;
 };
-
-void ListGraph::show() {
-  for (int i = 0; i < adjacencyLists.size(); i++) {
-    std::cout << i << ": ";
-    for (auto pair : adjacencyLists[i]) {
-      std::cout << pair.first << "(" << pair.second << ") ";
-    }
-    std::cout << std::endl;
-  }
-}
 
 void ListGraph::AddEdge(int from, int to, int weight) {
   assert(0 <= from && from < adjacencyLists.size());
@@ -75,7 +63,8 @@ std::vector<std::pair<int, int>> ListGraph::GetPrevVertices(int vertex) const {
 
 class WeightLessComparator {
  public:
-  bool operator()(std::pair<int, int> const &A, std::pair<int, int> const &B) const {
+  bool operator()(std::pair<int, int> const &A,
+                  std::pair<int, int> const &B) const {
     if (A.first == B.first) {
       return false;
     }
@@ -106,13 +95,13 @@ int getShortestWay(int startPoint, int endPoint, ListGraph graph,
 
       if (nextWayLength < shortestWayLength[nextTown.first]) {
         shortestWayLength[nextTown.first] = nextWayLength;
-        previousPoint[nextTown.first] = currentTown.first;
-      } else
-        continue;
-
-      routes.insert(
-          std::make_pair(nextTown.first, shortestWayLength[nextTown.first]));
+        
+        routes.insert(
+            std::make_pair(nextTown.first, shortestWayLength[nextTown.first]));
+      }
     }
+
+    if (currentTown.first == endPoint) break;
   }
 
   unsigned int target = shortestWayLength[endPoint];
