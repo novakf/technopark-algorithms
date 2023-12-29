@@ -1,9 +1,18 @@
+/*
+4. Пятнашки неточные
+Написать алгоритм для решения игры в “пятнашки”. Решением задачи является
+приведение к виду: [ 1 2 3 4 ] [ 5 6 7 8 ] [ 9 10 11 12] [ 13 14 15 0 ], где 0
+задает пустую ячейку. Достаточно найти хотя бы какое-то решение. Число
+перемещений костяшек не обязано быть минимальным.
+*/
+
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstring>
 #include <iostream>
 #include <queue>
+#include <set>
 #include <unordered_map>
 
 const int FieldSize = 16;
@@ -27,7 +36,8 @@ class GameState {
   GameState MoveUp();
   GameState MoveDown();
 
-  int getPriority(int pos) { return priority[pos];}
+  int getStatePriority();
+  int getPosPriority(int pos) { return priority[pos]; }
   int getEmptyPos() { return emptyPos; }
 
   bool operator==(const GameState &other) const { return field == other.field; }
@@ -35,22 +45,8 @@ class GameState {
  private:
   size_t getInvCount() const;
 
-  int manhattanDistance(int start, int end) {
-    int startX = start / 4;
-    int startY = start % 4;
-    int endX = end / 4;
-    int endY = end % 4;
-
-    return abs(startX - endX) + abs(startY - endY);
-  }
-
-  void updatePriorities() {
-    for (int i = 0; i < FieldSize; i++) {
-      priority[i] =
-          manhattanDistance(emptyPos, i) + manhattanDistance(i, field[i] - 1);
-    }
-    priority[emptyPos] = -1;
-  }
+  int manhattanDistance(int start, int end);
+  void updatePriorities();
 
   std::array<int, FieldSize> field;
   std::array<float, FieldSize> priority;
@@ -60,6 +56,30 @@ class GameState {
   friend std::ostream &operator<<(std::ostream &out, const GameState &state);
 };
 
+int GameState::getStatePriority() {
+  int sum = 0;
+  for (int i = 0; i < FieldSize; i++) {
+    sum += priority[i];
+  }
+  return sum;
+}
+
+int GameState::manhattanDistance(int start, int end) {
+  int startX = start / 4;
+  int startY = start % 4;
+  int endX = end / 4;
+  int endY = end % 4;
+
+  return abs(startX - endX) + abs(startY - endY);
+}
+
+void GameState::updatePriorities() {
+  for (int i = 0; i < FieldSize; i++) {
+    priority[i] = -abs(i - emptyPos) + manhattanDistance(i, field[i] - 1);
+  }
+  priority[emptyPos] = 0;
+}
+
 GameState::GameState(const std::array<int, FieldSize> &field) : field(field) {
   emptyPos = -1;
   for (int i = 0; i < FieldSize; i++) {
@@ -67,11 +87,11 @@ GameState::GameState(const std::array<int, FieldSize> &field) : field(field) {
       emptyPos = i;
     }
   }
+
   for (int i = 0; i < FieldSize; i++) {
-    priority[i] =
-        manhattanDistance(emptyPos, i) + manhattanDistance(i, field[i] - 1);
+    priority[i] = -abs(i - emptyPos) + manhattanDistance(i, field[i] - 1);
   }
-  priority[emptyPos] = -1;
+  priority[emptyPos] = 0;
 
   assert(emptyPos != -1);
 }
@@ -101,6 +121,7 @@ GameState GameState::MoveLeft() {
   assert(CanMoveLeft());
 
   GameState newState(*this);
+
   std::swap(newState.field[emptyPos], newState.field[emptyPos + 1]);
   newState.emptyPos++;
 
@@ -164,6 +185,15 @@ std::ostream &operator<<(std::ostream &out, const GameState &state) {
   return out;
 }
 
+class GameStateLessComparator {
+ public:
+  bool operator()(std::pair<int, GameState> const &A,
+                  std::pair<int, GameState> const &B) const {
+    if (A.first == B.first) return true;
+    return A.first < B.first;
+  }
+};
+
 std::string GetSolution(const std::array<int, FieldSize> &field) {
   GameState startState(field);
 
@@ -172,84 +202,54 @@ std::string GetSolution(const std::array<int, FieldSize> &field) {
   std::unordered_map<GameState, char, GameStateHasher> visited;
   visited[startState] = 'S';
 
-  std::queue<GameState> queue;
-  queue.push(startState);
+  std::set<std::pair<int, GameState>, GameStateLessComparator> stateSet;
+  stateSet.insert(std::make_pair(startState.getStatePriority(), startState));
 
   while (true) {
-    GameState state = queue.front();
-    queue.pop();
+    std::pair<int, GameState> state = *stateSet.begin();
+    stateSet.erase(stateSet.begin());
 
-    int emptyPos = state.getEmptyPos();
+    int emptyPos = state.second.getEmptyPos();
 
-    int upPriority = state.CanMoveUp() ? state.getPriority(emptyPos + 4) : -1;
-    int downPriority =
-        state.CanMoveDown() ? state.getPriority(emptyPos - 4) : -1;
-    int leftPriority =
-        state.CanMoveLeft() ? state.getPriority(emptyPos + 1) : -1;
-    int rightPriority =
-        state.CanMoveRight() ? state.getPriority(emptyPos - 1) : -1;
+    if (state.second.IsComplete()) break;
 
-    int highestPriority = std::max(std::max(leftPriority, rightPriority),
-                                   std::max(upPriority, downPriority));
-
-    std::cout << std::endl
-              << "PR:" << highestPriority << " " << leftPriority << " "
-              << rightPriority << " " << upPriority << " " << downPriority
-              << " " << std::endl
-              << std::endl;
-
-    for (int i = 0; i < 16; i++) {
-      std::cout << state.getPriority(i) << " ";
-      if (i % 4 == 3) std::cout << std::endl;
-    }
-    std::cout << std::endl;
-
-    std::cout << state;
-
-    if (state.IsComplete()) break;
-
-    if (state.CanMoveLeft() && leftPriority == highestPriority) {
-      GameState newState = state.MoveLeft();
+    if (state.second.CanMoveLeft()) {
+      GameState newState = state.second.MoveLeft();
+      int priority = newState.getStatePriority();
       if (visited.find(newState) == visited.end()) {
         visited[newState] = 'L';
-        queue.push(newState);
+        stateSet.insert(std::make_pair(priority, newState));
       }
-      std::cout << "STEP: L" << std::endl;
-      continue;
     }
-    if (state.CanMoveUp() && upPriority == highestPriority) {
-      GameState newState = state.MoveUp();
+    if (state.second.CanMoveUp()) {
+      GameState newState = state.second.MoveUp();
+      int priority = newState.getStatePriority();
       if (visited.find(newState) == visited.end()) {
         visited[newState] = 'U';
-        queue.push(newState);
+        stateSet.insert(std::make_pair(priority, newState));
       }
-      std::cout << "STEP: U";
-      continue;
     }
-    if (state.CanMoveRight() && rightPriority == highestPriority) {
-      GameState newState = state.MoveRight();
+    if (state.second.CanMoveRight()) {
+      GameState newState = state.second.MoveRight();
+      int priority = newState.getStatePriority();
       if (visited.find(newState) == visited.end()) {
         visited[newState] = 'R';
-        queue.push(newState);
+        stateSet.insert(std::make_pair(priority, newState));
       }
-      std::cout << "STEP: R";
-      continue;
     }
-    if (state.CanMoveDown() && downPriority == highestPriority) {
-      GameState newState = state.MoveDown();
+    if (state.second.CanMoveDown()) {
+      GameState newState = state.second.MoveDown();
+      int priority = newState.getStatePriority();
       if (visited.find(newState) == visited.end()) {
         visited[newState] = 'D';
-        queue.push(newState);
+        stateSet.insert(std::make_pair(priority, newState));
       }
-      std::cout << "STEP: D";
-      continue;
     }
   }
 
   std::string path;
   GameState state(finishField);
 
-  std::cout << state << std::endl;
   while (visited[state] != 'S') {
     char move = visited[state];
     switch (move) {
@@ -274,8 +274,6 @@ std::string GetSolution(const std::array<int, FieldSize> &field) {
         break;
       }
     }
-
-    // std::cout << state << std::endl;
   }
 
   std::reverse(path.begin(), path.end());

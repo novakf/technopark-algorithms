@@ -75,19 +75,13 @@ int getShortestWaysCount(int startPoint, int endPoint, ListGraph graph,
     qu.pop();
 
     for (int nextVertex : graph.GetNextVertices(currentVertex)) {
-      int nextWayLength = shortestWayLength[currentVertex] + 1;
-
-      if (nextWayLength < shortestWayLength[nextVertex]) {
-        shortestWayLength[nextVertex] = nextWayLength;
-        previousPointer[nextVertex] = currentVertex;
+      if (shortestWayLength[currentVertex] + 1 < shortestWayLength[nextVertex]) {
+        shortestWayLength[nextVertex] = shortestWayLength[currentVertex] + 1;
         shortestWaysCounter[nextVertex] = shortestWaysCounter[currentVertex];
-      } else if (nextWayLength == shortestWayLength[nextVertex]) {
+        qu.push(nextVertex);
+      } else if (shortestWayLength[currentVertex] + 1 == shortestWayLength[nextVertex]) {
         shortestWaysCounter[nextVertex] += shortestWaysCounter[currentVertex];
-        continue;
-      } else
-        continue;
-
-      qu.push(nextVertex);
+      }
     }
   }
 
