@@ -9,6 +9,7 @@
 #include <iostream>
 #include <queue>
 #include <vector>
+#include <functional>
 
 struct ListGraph {
  public:
@@ -57,14 +58,14 @@ std::vector<int> ListGraph::GetPrevVertices(int vertex) const {
   return prevVertices;
 }
 
+
+
 int getShortestWaysCount(int startPoint, int endPoint, ListGraph graph,
                          int verticesCount, int edgesCount) {
   std::vector<int> shortestWayLength(verticesCount, edgesCount);  // d[]
-  std::vector<int> previousPointer(verticesCount);                // p[]
   std::vector<int> shortestWaysCounter(verticesCount, 0);         // k[]
 
   shortestWayLength[startPoint] = 0;
-  previousPointer[startPoint] = -1;
   shortestWaysCounter[startPoint] = 1;
 
   std::queue<int> qu;
@@ -75,11 +76,13 @@ int getShortestWaysCount(int startPoint, int endPoint, ListGraph graph,
     qu.pop();
 
     for (int nextVertex : graph.GetNextVertices(currentVertex)) {
-      if (shortestWayLength[currentVertex] + 1 < shortestWayLength[nextVertex]) {
+      if (shortestWayLength[currentVertex] + 1 <
+          shortestWayLength[nextVertex]) {
         shortestWayLength[nextVertex] = shortestWayLength[currentVertex] + 1;
         shortestWaysCounter[nextVertex] = shortestWaysCounter[currentVertex];
         qu.push(nextVertex);
-      } else if (shortestWayLength[currentVertex] + 1 == shortestWayLength[nextVertex]) {
+      } else if (shortestWayLength[currentVertex] + 1 ==
+                 shortestWayLength[nextVertex]) {
         shortestWaysCounter[nextVertex] += shortestWaysCounter[currentVertex];
       }
     }
